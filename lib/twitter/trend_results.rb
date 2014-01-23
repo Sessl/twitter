@@ -21,7 +21,7 @@ module Twitter
       # @param response [Hash]
       # @return [Twitter::Base]
       def from_response(response = {})
-        new(response[:body].first)
+        new(response.first)
       end
     end
 

@@ -1,12 +1,21 @@
 require 'base64'
-require 'faraday'
-require 'faraday/request/multipart'
+require 'http'
 require 'json'
 require 'timeout'
 require 'twitter/client'
 require 'twitter/error'
+require 'twitter/error/bad_gateway'
+require 'twitter/error/bad_request'
 require 'twitter/error/configuration_error'
-require 'twitter/error/request_timeout'
+require 'twitter/error/forbidden'
+require 'twitter/error/gateway_timeout'
+require 'twitter/error/internal_server_error'
+require 'twitter/error/not_acceptable'
+require 'twitter/error/not_found'
+require 'twitter/error/service_unavailable'
+require 'twitter/error/too_many_requests'
+require 'twitter/error/unauthorized'
+require 'twitter/error/unprocessable_entity'
 require 'twitter/rest/api/direct_messages'
 require 'twitter/rest/api/favorites'
 require 'twitter/rest/api/friends_and_followers'
@@ -23,9 +32,6 @@ require 'twitter/rest/api/trends'
 require 'twitter/rest/api/tweets'
 require 'twitter/rest/api/undocumented'
 require 'twitter/rest/api/users'
-require 'twitter/rest/request/multipart_with_file'
-require 'twitter/rest/response/parse_json'
-require 'twitter/rest/response/raise_error'
 
 module Twitter
   module REST
@@ -54,50 +60,17 @@ module Twitter
       attr_writer :connection_options, :middleware
       ENDPOINT = 'https://api.twitter.com'
 
-      def connection_options
-        @connection_options ||= {
-          :builder => middleware,
-          :headers => {
-            :accept => 'application/json',
-            :user_agent => user_agent,
-          },
-          :request => {
-            :open_timeout => 10,
-            :timeout => 30,
-          },
-        }
-      end
-
-      # @note Faraday's middleware stack implementation is comparable to that of Rack middleware.  The order of middleware is important: the first middleware on the list wraps all others, while the last middleware is the innermost one.
-      # @see https://github.com/technoweenie/faraday#advanced-middleware-usage
-      # @see http://mislav.uniqpath.com/2011/07/faraday-advanced-http/
-      # @return [Faraday::RackBuilder]
-      def middleware
-        @middleware ||= Faraday::RackBuilder.new do |faraday|
-          # Convert file uploads to Faraday::UploadIO objects
-          faraday.request :multipart_with_file
-          # Checks for files in the payload, otherwise leaves everything untouched
-          faraday.request :multipart
-          # Encodes as "application/x-www-form-urlencoded" if not already encoded
-          faraday.request :url_encoded
-          # Handle error responses
-          faraday.response :raise_error
-          # Parse JSON response bodies
-          faraday.response :parse_json
-          # Set default HTTP adapter
-          faraday.adapter :net_http
-        end
-      end
-
       # Perform an HTTP GET request
       def get(path, params = {})
-        request(:get, path, params)
+        header = auth_header(:get, path, params, params)
+        request(:get, path, {:params => params}, :authorization => header)
       end
 
       # Perform an HTTP POST request
       def post(path, params = {})
         signature_params = params.values.any? { |value| value.respond_to?(:to_io) } ? {} : params
-        request(:post, path, params, signature_params)
+        header = auth_header(:post, path, params, signature_params)
+        request(:post, path, {:form => params}, :authorization => header)
       end
 
       # @return [Boolean]
@@ -112,52 +85,22 @@ module Twitter
 
     private
 
-      # Returns a Faraday::Connection object
-      #
-      # @return [Faraday::Connection]
-      def connection
-        @connection ||= Faraday.new(ENDPOINT, connection_options)
+      def request(method, path, params = {}, headers = {})
+        response = HTTP.with(headers).send(method, ENDPOINT + path, params)
+        error_class = Twitter::Error.errors[response.code]
+        fail(error_class.from_response(response)) if error_class
+        response.parse
+      rescue JSON::ParserError
+        response.to_s.empty? ? nil : response.to_s
       end
 
-      def request(method, path, params = {}, signature_params = params)
-        response = connection.send(method.to_sym, path, params) do |request|
-          request.headers.update(request_headers(method, path, params, signature_params))
-        end
-        response.env
-      rescue Faraday::Error::TimeoutError, Timeout::Error => error
-        raise(Twitter::Error::RequestTimeout.new(error))
-      rescue Faraday::Error::ClientError, JSON::ParserError => error
-        fail(Twitter::Error.new(error))
-      end
-
-      def request_headers(method, path, params = {}, signature_params = params)
-        bearer_token_request = params.delete(:bearer_token_request)
-        headers = {}
-        if bearer_token_request
-          headers[:accept]        = '*/*'
-          headers[:authorization] = bearer_token_credentials_auth_header
-          headers[:content_type]  = 'application/x-www-form-urlencoded; charset=UTF-8'
-        else
-          headers[:authorization] = auth_token(method, path, params, signature_params)
-        end
-        headers
-      end
-
-      def auth_token(method, path, params = {}, signature_params = params)
+      def auth_header(method, path, params = {}, signature_params = params)
         if !user_token?
           @bearer_token = token unless bearer_token?
           bearer_auth_header
         else
           oauth_auth_header(method, ENDPOINT + path, signature_params).to_s
         end
-      end
-
-      # Generates authentication header for a bearer token request
-      #
-      # @return [String]
-      def bearer_token_credentials_auth_header
-        basic_auth_token = strict_encode64("#{@consumer_key}:#{@consumer_secret}")
-        "Basic #{basic_auth_token}"
       end
 
       def bearer_auth_header

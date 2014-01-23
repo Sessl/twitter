@@ -9,16 +9,12 @@ describe Twitter::REST::API::OAuth do
   describe '#token' do
     before do
       # WebMock treats Basic Auth differently so we have to chack against the full URL with credentials.
-      @oauth2_token_url = 'https://CK:CS@api.twitter.com/oauth2/token'
+      @oauth2_token_url = 'https://api.twitter.com/oauth2/token'
       stub_request(:post, @oauth2_token_url).with(:body => 'grant_type=client_credentials').to_return(:body => fixture('bearer_token.json'), :headers => {:content_type => 'application/json; charset=utf-8'})
     end
     it 'requests the correct resource' do
       @client.token
-      expect(a_request(:post, @oauth2_token_url).with(:body => {:grant_type => 'client_credentials'})).to have_been_made
-    end
-    it 'requests with the correct headers' do
-      @client.token
-      expect(a_request(:post, @oauth2_token_url).with(:headers => {:content_type => 'application/x-www-form-urlencoded; charset=UTF-8', :accept => '*/*'})).to have_been_made
+      expect(a_request(:post, @oauth2_token_url).with(:headers => {:content_type => 'application/x-www-form-urlencoded', :authorization => 'Basic Q0s6Q1M=', :accept => '*/*'}, :body => {:grant_type => 'client_credentials'})).to have_been_made
     end
     it 'returns the bearer token' do
       bearer_token = @client.token

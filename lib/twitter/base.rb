@@ -20,7 +20,7 @@ module Twitter
       # @param response [Hash]
       # @return [Twitter::Base]
       def from_response(response = {})
-        new(response[:body])
+        new(response)
       end
 
       # Define methods that retrieve the value from attributes

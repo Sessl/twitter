@@ -33,11 +33,11 @@ module Twitter
     class << self
       # Create a new error from an HTTP response
       #
-      # @param response [Hash]
+      # @param response [HTTP::Response]
       # @return [Twitter::Error]
-      def from_response(response = {})
-        error, code = parse_error(response[:body])
-        new(error, response[:response_headers], code)
+      def from_response(response)
+        error, code = parse_error(response.parse)
+        new(error, response.headers, code)
       end
 
       # @return [Hash]
@@ -77,7 +77,7 @@ module Twitter
     # @param code [Integer]
     # @return [Twitter::Error]
     def initialize(exception = $ERROR_INFO, response_headers = {}, code = nil)
-      @rate_limit = RateLimit.new(response_headers)
+      @rate_limit = Twitter::RateLimit.new(response_headers)
       @cause = exception
       @code = code
       exception.respond_to?(:message) ? super(exception.message) : super(exception.to_s)

@@ -19,7 +19,7 @@ module Twitter
       # @param request [Twitter::Request]
       # @return [Twitter::SearchResults]
       def from_response(response, request)
-        new(response[:body], request)
+        new(response, request)
       end
     end
 
@@ -62,7 +62,7 @@ module Twitter
     # @return [Hash]
     def fetch_next_page
       response = @client.send(@request_method, @path, next_page)
-      self.attrs = response[:body]
+      self.attrs = response
     end
 
     # @param attrs [Hash]

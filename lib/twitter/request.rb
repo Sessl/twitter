@@ -39,7 +39,7 @@ module Twitter
     # @param klass [Class]
     # @return [Array]
     def perform_with_objects(klass)
-      perform[:body].collect do |element|
+      perform.collect do |element|
         klass.new(element)
       end
     end
