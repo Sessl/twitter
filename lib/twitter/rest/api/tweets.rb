@@ -288,7 +288,7 @@ module Twitter
           response = post("/1.1/statuses/retweet/#{extract_id(tweet)}.json", options)
           retweeted_status = response.delete(:retweeted_status)
           retweeted_status[:retweeted_status] = response
-          Twitter::Tweet.from_response(retweeted_status)
+          Twitter::Tweet.new(retweeted_status)
         end
       end
     end

@@ -29,7 +29,7 @@ module Twitter
           headers[:accept]        = '*/*'
           headers[:authorization] = "Basic #{strict_encode64("#{@consumer_key}:#{@consumer_secret}")}"
           response = HTTP.with(headers).post('https://api.twitter.com/oauth2/token', :form => options)
-          Twitter::Token.from_response(response.parse)
+          Twitter::Token.new(response.parse)
         end
         alias_method :bearer_token, :token
 

@@ -87,8 +87,11 @@ module Twitter
 
       def request(method, path, params = {}, headers = {})
         response = HTTP.with(headers).send(method, ENDPOINT + path, params)
-        error_class = Twitter::Error.errors[response.code]
-        fail(error_class.from_response(response)) if error_class
+        if response.code != 200
+          error_class = Twitter::Error.errors[response.code]
+          error = error_class.new(response)
+          fail(error)
+        end
         response.parse
       rescue JSON::ParserError
         response.to_s.empty? ? nil : response.to_s

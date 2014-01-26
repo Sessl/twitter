@@ -12,17 +12,6 @@ module Twitter
     deprecate_alias :to_hash, :to_h
     deprecate_alias :to_hsh, :to_h
 
-    class << self
-      # Construct a new SearchResults object from a response hash
-      #
-      # @param response [Hash]
-      # @param request [Twitter::Request]
-      # @return [Twitter::SearchResults]
-      def from_response(response, request)
-        new(response, request)
-      end
-    end
-
     # Initializes a new SearchResults object
     #
     # @param attrs [Hash]

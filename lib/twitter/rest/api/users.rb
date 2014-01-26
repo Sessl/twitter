@@ -36,7 +36,7 @@ module Twitter
           response = send(request_method.to_sym, '/1.1/account/settings.json', options)
           # https://dev.twitter.com/issues/59
           response.update(:trend_location => Array(response[:trend_location]).first)
-          Twitter::Settings.from_response(response)
+          Twitter::Settings.new(response)
         end
 
         # Returns the requesting user if authentication was successful, otherwise raises {Twitter::Error::Unauthorized}
