@@ -1,10 +1,8 @@
-require 'descendants_tracker'
 require 'twitter/rate_limit'
 
 module Twitter
   # Custom error class for rescuing from all Twitter errors
   class Error < StandardError
-    extend DescendantsTracker
     attr_reader :cause, :code, :rate_limit
     alias_method :wrapped_exception, :cause
 
@@ -36,16 +34,8 @@ module Twitter
       # @param response [HTTP::Response]
       # @return [Twitter::Error]
       def from_response(response)
-        error, code = parse_error(response.parse)
-        new(error, response.headers, code)
-      end
-
-      # @return [Hash]
-      def errors
-        @errors ||= descendants.inject({}) do |hash, klass|
-          hash[klass::HTTP_STATUS_CODE] = klass
-          hash
-        end
+        message, code = parse_error(response.parse)
+        new(message, response.headers, code)
       end
 
     private
@@ -76,11 +66,62 @@ module Twitter
     # @param response_headers [Hash]
     # @param code [Integer]
     # @return [Twitter::Error]
-    def initialize(exception = $ERROR_INFO, response_headers = {}, code = nil)
+    def initialize(message = '', response_headers = {}, code = nil)
+      @message = message
       @rate_limit = Twitter::RateLimit.new(response_headers)
-      @cause = exception
       @code = code
-      exception.respond_to?(:message) ? super(exception.message) : super(exception.to_s)
     end
+
+    class ConfigurationError < ::ArgumentError; end
+
+    # Raised when Twitter returns a 4xx HTTP status code
+    class ClientError < self; end
+
+    # Raised when Twitter returns the HTTP status code 400
+    class BadRequest < ClientError; end
+
+    # Raised when Twitter returns the HTTP status code 401
+    class Unauthorized < ClientError; end
+
+    # Raised when Twitter returns the HTTP status code 403
+    class Forbidden < ClientError; end
+
+    # Raised when a Tweet has already been favorited
+    class AlreadyFavorited < Forbidden; end
+
+    # Raised when a Tweet has already been posted
+    class AlreadyPosted < Forbidden; end
+
+    # Raised when a Tweet has already been retweeted
+    class AlreadyRetweeted < Forbidden; end
+
+    # Raised when Twitter returns the HTTP status code 404
+    class NotFound < ClientError; end
+
+    # Raised when Twitter returns the HTTP status code 406
+    class NotAcceptable < ClientError; end
+
+    # Raised when Twitter returns the HTTP status code 422
+    class UnprocessableEntity < ClientError; end
+
+    # Raised when Twitter returns the HTTP status code 429
+    class TooManyRequests < ClientError; end
+    EnhanceYourCalm = TooManyRequests # rubocop:disable ConstantName
+    RateLimited = TooManyRequests # rubocop:disable ConstantName
+
+    # Raised when Twitter returns a 5xx HTTP status code
+    class ServerError < self; end
+
+    # Raised when Twitter returns the HTTP status code 500
+    class InternalServerError < ServerError; end
+
+    # Raised when Twitter returns the HTTP status code 502
+    class BadGateway < ServerError; end
+
+    # Raised when Twitter returns the HTTP status code 503
+    class ServiceUnavailable < ServerError; end
+
+    # Raised when Twitter returns the HTTP status code 504
+    class GatewayTimeout < ServerError; end
   end
 end

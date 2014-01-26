@@ -1,7 +1,5 @@
 require 'twitter/arguments'
-require 'twitter/error/already_posted'
-require 'twitter/error/already_retweeted'
-require 'twitter/error/forbidden'
+require 'twitter/error'
 require 'twitter/oembed'
 require 'twitter/request'
 require 'twitter/rest/api/utils'
@@ -124,8 +122,6 @@ module Twitter
           hash[:in_reply_to_status_id] = hash.delete(:in_reply_to_status).id unless hash[:in_reply_to_status].nil?
           hash[:place_id] = hash.delete(:place).woeid unless hash[:place].nil?
           perform_with_object(:post, '/1.1/statuses/update.json', hash.merge(:status => status), Twitter::Tweet)
-        rescue Twitter::Error::Forbidden => error
-          handle_forbidden_error(Twitter::Error::AlreadyPosted, error)
         end
 
         # Retweets the specified Tweets as the authenticating user
@@ -146,8 +142,8 @@ module Twitter
           parallel_map(arguments) do |tweet|
             begin
               post_retweet(extract_id(tweet), arguments.options)
-            rescue Twitter::Error::Forbidden => error
-              raise unless error.message == Twitter::Error::AlreadyRetweeted::MESSAGE
+            rescue Twitter::Error::AlreadyRetweeted
+              next
             end
           end.compact
         end
@@ -169,11 +165,7 @@ module Twitter
         def retweet!(*args)
           arguments = Twitter::Arguments.new(args)
           parallel_map(arguments) do |tweet|
-            begin
-              post_retweet(extract_id(tweet), arguments.options)
-            rescue Twitter::Error::Forbidden => error
-              handle_forbidden_error(Twitter::Error::AlreadyRetweeted, error)
-            end
+            post_retweet(extract_id(tweet), arguments.options)
           end.compact
         end
 
@@ -202,8 +194,6 @@ module Twitter
           hash[:in_reply_to_status_id] = hash.delete(:in_reply_to_status).id unless hash[:in_reply_to_status].nil?
           hash[:place_id] = hash.delete(:place).woeid unless hash[:place].nil?
           perform_with_object(:post, '/1.1/statuses/update_with_media.json', hash.merge('media[]' => media, 'status' => status), Twitter::Tweet)
-        rescue Twitter::Error::Forbidden => error
-          handle_forbidden_error(Twitter::Error::AlreadyPosted, error)
         end
 
         # Returns oEmbed for a Tweet

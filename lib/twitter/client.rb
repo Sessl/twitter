@@ -54,12 +54,12 @@ module Twitter
     # Ensures that all credentials set during configuration are of a
     # valid type. Valid types are String and Symbol.
     #
-    # @raise [Twitter::Error::ConfigurationError] Error is raised when
+    # @raise [Twitter::ConfigurationError] Error is raised when
     #   supplied twitter credentials are not a String or Symbol.
     def validate_credential_type!
       credentials.each do |credential, value|
         next if value.nil?
-        fail(Error::ConfigurationError.new("Invalid #{credential} specified: #{value.inspect} must be a string or symbol.")) unless value.is_a?(String) || value.is_a?(Symbol)
+        fail(Twitter::Error::ConfigurationError.new("Invalid #{credential} specified: #{value.inspect} must be a string or symbol.")) unless value.is_a?(String) || value.is_a?(Symbol)
       end
     end
 

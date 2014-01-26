@@ -4,18 +4,6 @@ require 'json'
 require 'timeout'
 require 'twitter/client'
 require 'twitter/error'
-require 'twitter/error/bad_gateway'
-require 'twitter/error/bad_request'
-require 'twitter/error/configuration_error'
-require 'twitter/error/forbidden'
-require 'twitter/error/gateway_timeout'
-require 'twitter/error/internal_server_error'
-require 'twitter/error/not_acceptable'
-require 'twitter/error/not_found'
-require 'twitter/error/service_unavailable'
-require 'twitter/error/too_many_requests'
-require 'twitter/error/unauthorized'
-require 'twitter/error/unprocessable_entity'
 require 'twitter/rest/api/direct_messages'
 require 'twitter/rest/api/favorites'
 require 'twitter/rest/api/friends_and_followers'
@@ -85,16 +73,49 @@ module Twitter
 
     private
 
-      def request(method, path, params = {}, headers = {})
+      def request(method, path, params = {}, headers = {}) # rubocop:disable CyclomaticComplexity, MethodLength
         response = HTTP.with(headers).send(method, ENDPOINT + path, params)
-        if response.code != 200
-          error_class = Twitter::Error.errors[response.code]
-          error = error_class.new(response)
-          fail(error)
-        end
+        handle_exceptions(response)
         response.parse
       rescue JSON::ParserError
         response.to_s.empty? ? nil : response.to_s
+      end
+
+      def handle_exceptions(response)
+        case response.code
+        when 400
+          fail(Twitter::Error::BadRequest.from_response(response))
+        when 401
+          fail(Twitter::Error::Unauthorized.from_response(response))
+        when 403
+          error = Twitter::Error::Forbidden.from_response(response)
+          case error.message
+          when 'You have already favorited this status.'
+            fail(Twitter::Error::AlreadyFavorited.from_response(response))
+          when 'Status is a duplicate.'
+            fail(Twitter::Error::AlreadyPosted.from_response(response))
+          when 'sharing is not permissible for this status (Share validations failed)'
+            fail(Twitter::Error::AlreadyRetweeted.from_response(response))
+          else
+            fail(error)
+          end
+        when 404
+          fail(Twitter::Error::NotFound.from_response(response))
+        when 406
+          fail(Twitter::Error::NotAcceptable.from_response(response))
+        when 422
+          fail(Twitter::Error::UnprocessableEntity.from_response(response))
+        when 429
+          fail(Twitter::Error::TooManyRequests.from_response(response))
+        when 500
+          fail(Twitter::Error::InternalServerError.from_response(response))
+        when 501
+          fail(Twitter::Error::BadGateway.from_response(response))
+        when 502
+          fail(Twitter::Error::ServiceUnavailable.from_response(response))
+        when 503
+          fail(Twitter::Error::GatewayTimeout.from_response(response))
+        end
       end
 
       def auth_header(method, path, params = {}, signature_params = params)

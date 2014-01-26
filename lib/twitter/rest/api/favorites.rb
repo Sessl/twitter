@@ -1,6 +1,5 @@
 require 'twitter/arguments'
-require 'twitter/error/already_favorited'
-require 'twitter/error/forbidden'
+require 'twitter/error'
 require 'twitter/request'
 require 'twitter/rest/api/utils'
 require 'twitter/tweet'
@@ -73,8 +72,8 @@ module Twitter
           parallel_map(arguments) do |tweet|
             begin
               perform_with_object(:post, '/1.1/favorites/create.json', arguments.options.merge(:id => extract_id(tweet)), Twitter::Tweet)
-            rescue Twitter::Error::Forbidden => error
-              raise unless error.message == Twitter::Error::AlreadyFavorited::MESSAGE
+            rescue Twitter::Error::AlreadyFavorited
+              next
             end
           end.compact
         end
@@ -98,11 +97,7 @@ module Twitter
         def favorite!(*args)
           arguments = Twitter::Arguments.new(args)
           parallel_map(arguments) do |tweet|
-            begin
-              perform_with_object(:post, '/1.1/favorites/create.json', arguments.options.merge(:id => extract_id(tweet)), Twitter::Tweet)
-            rescue Twitter::Error::Forbidden => error
-              handle_forbidden_error(Twitter::Error::AlreadyFavorited, error)
-            end
+            perform_with_object(:post, '/1.1/favorites/create.json', arguments.options.merge(:id => extract_id(tweet)), Twitter::Tweet)
           end
         end
         alias_method :create_favorite!, :favorite!
